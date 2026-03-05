@@ -1,0 +1,17 @@
+name: Résumé quotidien 18h
+
+on:
+  schedule:
+    - cron: "0 16 * * *"  # 18h CEST (été, UTC+2)
+    - cron: "0 17 * * *"  # 18h CET  (hiver, UTC+1)
+  workflow_dispatch:       # Déclenchement manuel possible
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appel endpoint résumé
+        run: |
+          curl --fail -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://mimis-app.vercel.app/api/cron/daily-summary
