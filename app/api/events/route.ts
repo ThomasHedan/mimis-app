@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { notifyAll } from "@/lib/notifyAll";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -56,5 +57,12 @@ export async function POST(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notification pour tous
+  const dateLabel = new Date(start_at).toLocaleDateString("fr-FR", {
+    weekday: "short", day: "numeric", month: "short",
+  });
+  await notifyAll(supabase, user.id, "Nouvel événement", `• ${data.title} — ${dateLabel}${location ? ` · ${location}` : ""}`);
+
   return NextResponse.json(data, { status: 201 });
 }

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { notifyAll } from "@/lib/notifyAll";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -10,7 +11,7 @@ export async function GET() {
     .from("chores")
     .select("*")
     .order("done", { ascending: true })
-    .order("priority", { ascending: false }) // high > medium > low
+    .order("priority", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -39,5 +40,14 @@ export async function POST(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notification pour tous
+  const lines = [`• ${data.title}`];
+  if (due_date) {
+    const dateLabel = new Date(due_date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    lines.push(`  Pour le ${dateLabel}`);
+  }
+  await notifyAll(supabase, user.id, "Nouvelle tâche", lines.join("\n"));
+
   return NextResponse.json(data, { status: 201 });
 }
