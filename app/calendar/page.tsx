@@ -113,13 +113,22 @@ export default function CalendarPage() {
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  const eventsByDay: Record<number, string[]> = {};
+  type SpanInfo = { id: string; color: string | null; isStart: boolean; isEnd: boolean };
+  const spansByDay: Record<number, SpanInfo[]> = {};
+  const mStart = new Date(year, month, 1);
+  const mEnd   = new Date(year, month, daysInMonth, 23, 59, 59);
+
   for (const ev of events) {
-    const d = new Date(ev.start_at);
-    if (d.getMonth() === month && d.getFullYear() === year) {
-      const day = d.getDate();
-      if (!eventsByDay[day]) eventsByDay[day] = [];
-      eventsByDay[day].push(ev.color ?? "");
+    const evStart = new Date(ev.start_at);
+    const evEnd   = ev.end_at ? new Date(ev.end_at) : new Date(ev.start_at);
+    if (evEnd < mStart || evStart > mEnd) continue;
+
+    const clampedStart = evStart < mStart ? 1 : evStart.getDate();
+    const clampedEnd   = Math.max(clampedStart, evEnd > mEnd ? daysInMonth : evEnd.getDate());
+
+    for (let d = clampedStart; d <= clampedEnd; d++) {
+      if (!spansByDay[d]) spansByDay[d] = [];
+      spansByDay[d].push({ id: ev.id, color: ev.color, isStart: d === clampedStart, isEnd: d === clampedEnd });
     }
   }
 
@@ -157,21 +166,35 @@ export default function CalendarPage() {
           {cells.map((day, i) => {
             const isToday    = day !== null && today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
             const isSelected = day === selectedDay;
-            const dayColors  = day !== null ? (eventsByDay[day] ?? []) : [];
+            const spans      = day !== null ? (spansByDay[day] ?? []) : [];
             return (
               <div
                 key={i}
                 onClick={() => { if (!day) return; setSelectedDay(isSelected ? null : day); }}
                 className={`cal-cell${!day ? " empty" : ""}${isToday && !isSelected ? " today" : ""}${isSelected ? " selected" : ""}`}
               >
-                {day}
-                {dayColors.length > 0 && (
-                  <span style={{ display: "flex", gap: "2px", marginTop: "2px" }}>
-                    {dayColors.slice(0, 3).map((c, ci) => (
-                      <span key={ci} className="cal-dot" style={{ background: isSelected ? "#fff" : (COLOR_HEX[c] ?? "var(--fg)") }} />
-                    ))}
-                  </span>
-                )}
+                <span className="cal-day-num">{day}</span>
+                {spans.map((span) => {
+                  const single   = span.isStart && span.isEnd;
+                  const barColor = isSelected
+                    ? "rgba(255,255,255,0.5)"
+                    : (COLOR_HEX[span.color ?? ""] ?? "var(--fg)");
+                  return (
+                    <div
+                      key={span.id}
+                      className="cal-event-bar"
+                      style={{
+                        background:   barColor,
+                        borderRadius: single          ? "9999px"
+                          : span.isStart              ? "9999px 0 0 9999px"
+                          : span.isEnd                ? "0 9999px 9999px 0"
+                          : "0",
+                        marginLeft:  single || span.isStart ? "2px"  : "-1px",
+                        marginRight: single || span.isEnd   ? "2px"  : "-1px",
+                      }}
+                    />
+                  );
+                })}
               </div>
             );
           })}
