@@ -1,68 +1,55 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Composant interne qui lit les searchParams — doit être dans un Suspense
-function LoginForm() {
+export default function ResetPasswordPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const linkError = searchParams.get("error") === "invalid_link";
-
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(
-    linkError ? "Lien invalide ou expiré. Demande un nouveau lien de réinitialisation." : null
-  );
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
 
+    if (password.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
-      // Message volontairement générique : ne révèle pas si l'email existe
-      setError("Identifiants incorrects. Vérifie ton email et mot de passe.");
+      setError("Une erreur est survenue. Le lien est peut-être expiré.");
       setLoading(false);
       return;
     }
 
-    router.refresh();
     router.push("/");
   }
 
   return (
     <main style={s.main}>
       <div style={s.card}>
-        <h1 style={s.title}>MimisApp</h1>
-        <p style={s.subtitle}>Connexion</p>
+        <h1 style={s.title}>Nouveau mot de passe</h1>
+        <p style={s.subtitle}>Choisis un mot de passe pour ton compte.</p>
 
         <form onSubmit={handleSubmit} style={s.form} noValidate>
-          <div style={s.field}>
-            <label htmlFor="email" style={s.label}>Email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={s.input}
-              disabled={loading}
-            />
-          </div>
-
           <div style={s.field}>
             <label htmlFor="password" style={s.label}>Mot de passe</label>
             <input
               id="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -71,23 +58,28 @@ function LoginForm() {
             />
           </div>
 
+          <div style={s.field}>
+            <label htmlFor="confirm" style={s.label}>Confirmer</label>
+            <input
+              id="confirm"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              style={s.input}
+              disabled={loading}
+            />
+          </div>
+
           {error && <p style={s.error} role="alert">{error}</p>}
 
           <button type="submit" style={s.button} disabled={loading}>
-            {loading ? "Connexion…" : "Se connecter"}
+            {loading ? "Enregistrement…" : "Enregistrer"}
           </button>
         </form>
       </div>
     </main>
-  );
-}
-
-// Page exportée — enveloppe LoginForm dans Suspense (requis par useSearchParams)
-export default function LoginPage() {
-  return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
   );
 }
 
@@ -102,7 +94,7 @@ const s = {
     boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
   } as React.CSSProperties,
   title: {
-    fontSize: "1.75rem", fontWeight: 700, color: "#18181b",
+    fontSize: "1.5rem", fontWeight: 700, color: "#18181b",
     letterSpacing: "-0.02em",
   } as React.CSSProperties,
   subtitle: {
@@ -120,8 +112,7 @@ const s = {
   } as React.CSSProperties,
   input: {
     padding: "0.625rem 0.75rem", borderRadius: "0.5rem",
-    border: "1px solid #d4d4d8",
-    fontSize: "16px", // 16px minimum requis sur iOS pour éviter le zoom au focus
+    border: "1px solid #d4d4d8", fontSize: "16px",
     color: "#18181b", outline: "none", width: "100%",
   } as React.CSSProperties,
   error: {
