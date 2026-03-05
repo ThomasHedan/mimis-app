@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sendPushToAll } from "@/lib/webpush";
 
 /**
- * Insère une notification pour tous les utilisateurs (via la table profiles).
+ * Insère une notification pour tous les utilisateurs (via la table profiles)
+ * et envoie un push web à tous les abonnés.
  * Si profiles est vide ou inaccessible, notifie au moins le créateur.
  */
 export async function notifyAll(
@@ -25,4 +27,7 @@ export async function notifyAll(
   if (error) {
     console.error("[notifyAll] Erreur insertion notifications:", error.message, { ids, title });
   }
+
+  // Envoi des push web
+  await sendPushToAll(supabase, title, body);
 }

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { sendPushToUser } from "@/lib/webpush";
 
 export const dynamic = "force-dynamic";
 
@@ -121,6 +122,11 @@ export async function GET(request: Request) {
 
   if (toInsert.length > 0) {
     await supabase.from("notifications").insert(toInsert);
+
+    // Envoi des push web par utilisateur
+    await Promise.allSettled(
+      toInsert.map((n) => sendPushToUser(supabase, n.user_id, n.title, n.body))
+    );
   }
 
   return NextResponse.json({ ok: true, sent: toInsert.length });
