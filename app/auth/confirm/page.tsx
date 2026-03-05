@@ -4,28 +4,26 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Page de transit pour le flow Implicit de Supabase.
-// Supabase redirige ici après vérification du lien email, avec les tokens
-// dans le hash de l'URL (#access_token=xxx&type=recovery...).
-// Le hash n'est jamais envoyé au serveur — on le lit ici côté client.
-// createBrowserClient détecte automatiquement le hash et établit la session.
 export default function AuthConfirmPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // Vérifie d'abord si le hash contient une erreur (lien expiré, déjà utilisé…)
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    if (hash.get("error")) {
+      router.replace("/login?error=invalid_link");
+      return;
+    }
+
     const supabase = createClient();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event) => {
-        if (event === "PASSWORD_RECOVERY") {
-          // Lien de reset password → page de nouveau mot de passe
-          router.replace("/reset-password");
-        } else if (event === "SIGNED_IN") {
-          // Lien d'invitation acceptée → accueil
-          router.replace("/");
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        router.replace("/reset-password");
+      } else if (event === "SIGNED_IN") {
+        router.replace("/");
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   }, [router]);
