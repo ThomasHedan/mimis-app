@@ -26,6 +26,15 @@ export type Habit = {
   logged_today?: boolean;
 };
 
+export type Notification = {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  read: boolean;
+  created_at: string;
+};
+
 export type BudgetCategory = {
   id: string;
   name: string;
