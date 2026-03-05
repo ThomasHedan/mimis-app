@@ -138,22 +138,20 @@ input, textarea, select {
   font-family: var(--font);
   font-size: 16px; /* empêche zoom iOS */
   color: var(--fg);
+  outline: none;
 }
 
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="datetime-local"],
-input[type="date"] {
+input:not([type="checkbox"]):not([type="radio"]) {
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   width: 100%;
   background: var(--surface);
-  outline: none;
 }
 
-input:focus { border-color: var(--fg); }
+input:not([type="checkbox"]):not([type="radio"]):focus,
+textarea:focus,
+select:focus { border-color: var(--fg); }
 
 .btn {
   padding: 0.65rem 1.25rem;
@@ -297,19 +295,13 @@ input:focus { border-color: var(--fg); }
 /* ── Textarea + Select ────────────────────────────────────── */
 textarea,
 select {
-  font-family: var(--font);
-  font-size: 16px;
-  color: var(--fg);
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   width: 100%;
   background: var(--surface);
-  outline: none;
 }
 
-textarea:focus,
-select:focus { border-color: var(--fg); }
 textarea { resize: vertical; min-height: 5rem; line-height: 1.5; }
 
 /* ── Modal ────────────────────────────────────────────────── */
