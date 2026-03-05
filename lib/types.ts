@@ -26,6 +26,26 @@ export type Habit = {
   logged_today?: boolean;
 };
 
+export type BudgetCategory = {
+  id: string;
+  name: string;
+  color: string;
+  monthly_limit: number;
+  icon: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+export type BudgetEntry = {
+  id: string;
+  category_id: string;
+  amount: number;
+  note: string | null;
+  date: string;
+  created_by: string;
+  created_at: string;
+};
+
 export type Chore = {
   id: string;
   title: string;

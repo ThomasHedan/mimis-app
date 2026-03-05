@@ -11,6 +11,7 @@ const links = [
   { href: "/calendar", label: "Agenda",    icon: "◷", exact: false },
   { href: "/habits",   label: "Habitudes", icon: "✓", exact: false },
   { href: "/chores",   label: "Tâches",    icon: "⊡", exact: false },
+  { href: "/budget",   label: "Budget",    icon: "€", exact: false },
 ];
 
 export default function NavBar() {
