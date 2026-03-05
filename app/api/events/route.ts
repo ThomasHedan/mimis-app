@@ -1,20 +1,29 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  const { searchParams } = new URL(request.url);
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
 
-  const { data, error } = await supabase
-    .from("events")
-    .select("*")
-    .gte("start_at", startOfToday.toISOString())
-    .order("start_at", { ascending: true })
-    .limit(50);
+  let query = supabase.from("events").select("*");
+
+  if (from) {
+    query = query.gte("start_at", from);
+  } else {
+    // Par défaut : depuis aujourd'hui
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    query = query.gte("start_at", today.toISOString());
+  }
+
+  if (to) query = query.lte("start_at", to);
+
+  const { data, error } = await query.order("start_at", { ascending: true }).limit(100);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);

@@ -22,6 +22,7 @@ export type Chore = {
   title: string;
   done: boolean;
   done_at: string | null;
+  due_date: string | null;
   created_by: string;
   created_at: string;
 };

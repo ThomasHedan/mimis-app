@@ -1,27 +1,294 @@
-/* Reset minimal — aucune dépendance externe (pas de Google Fonts, pas de CDN) */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --color-bg: #ffffff;
-  --color-fg: #18181b;
-  --color-accent: #7c3aed;
-  --color-muted: #71717a;
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --fg: #18181b;
+  --muted: #71717a;
+  --border: #e4e4e7;
+  --subtle: #f4f4f5;
+  --green: #16a34a;
+  --red: #dc2626;
+  --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --nav-w: 220px;
+  --radius: 0.75rem;
 }
 
 html {
-  font-family: var(--font-sans);
-  background-color: var(--color-bg);
-  color: var(--color-fg);
-  /* Empêche le zoom non voulu sur iOS lors du focus sur les inputs */
+  font-family: var(--font);
   -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+  color: var(--fg);
 }
 
-body {
-  min-height: 100dvh; /* dvh : prend en compte la barre d'adresse mobile */
-  line-height: 1.5;
+body { min-height: 100dvh; line-height: 1.5; }
+
+/* ── Shell responsive ─────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--bg);
 }
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 5rem; /* espace pour la nav mobile */
+}
+
+/* ── Navigation ───────────────────────────────────────────── */
+.nav-mobile {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom, 0.5rem);
+  z-index: 100;
+}
+
+.nav-mobile a {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  gap: 0.2rem;
+}
+
+.nav-mobile a.active { color: var(--fg); font-weight: 700; }
+
+.nav-desktop { display: none; }
+
+@media (min-width: 768px) {
+  .nav-mobile { display: none; }
+
+  .nav-desktop {
+    display: flex;
+    flex-direction: column;
+    width: var(--nav-w);
+    min-height: 100dvh;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    padding: 1.75rem 1rem;
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    flex-shrink: 0;
+    gap: 0.25rem;
+  }
+
+  .nav-desktop .nav-logo {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--fg);
+    letter-spacing: -0.02em;
+    padding: 0 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .nav-desktop a {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+  }
+
+  .nav-desktop a:hover { background: var(--subtle); color: var(--fg); }
+  .nav-desktop a.active { background: var(--subtle); color: var(--fg); font-weight: 600; }
+
+  .nav-desktop .nav-bottom { margin-top: auto; }
+
+  .app-content { padding-bottom: 2rem; }
+}
+
+/* ── Page wrapper ─────────────────────────────────────────── */
+.page {
+  padding: 1.25rem 1rem;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .page { padding: 2rem 2.5rem; max-width: 860px; }
+}
+
+/* ── Cards / Sections ─────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  margin-bottom: 0.75rem;
+}
+
+/* ── Formulaires ──────────────────────────────────────────── */
+input, textarea, select {
+  font-family: var(--font);
+  font-size: 16px; /* empêche zoom iOS */
+  color: var(--fg);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="datetime-local"],
+input[type="date"] {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  width: 100%;
+  background: var(--surface);
+  outline: none;
+}
+
+input:focus { border-color: var(--fg); }
+
+.btn {
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.5rem;
+  background: var(--fg);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: var(--font);
+  white-space: nowrap;
+}
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost {
+  background: none;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* ── Calendrier grid ──────────────────────────────────────── */
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.cal-day-label {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0.3rem 0;
+  text-transform: uppercase;
+}
+
+.cal-cell {
+  position: relative;
+  text-align: center;
+  padding: 0.45rem 0.2rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  min-height: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+}
+
+.cal-cell:hover { background: var(--subtle); }
+.cal-cell.today { font-weight: 700; background: var(--subtle); }
+.cal-cell.selected { background: var(--fg); color: #fff; }
+.cal-cell.selected .cal-dot { background: #fff; }
+.cal-cell.empty { cursor: default; }
+.cal-cell.empty:hover { background: none; }
+
+.cal-dot {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--fg);
+  margin-top: 2px;
+}
+
+/* ── Check rows ───────────────────────────────────────────── */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font);
+}
+
+.check-row:last-child { border-bottom: none; }
+
+.check-box {
+  width: 1.2rem; height: 1.2rem;
+  border: 2px solid var(--border);
+  border-radius: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  color: #fff;
+  transition: all 0.15s;
+}
+
+.check-box.done { background: var(--fg); border-color: var(--fg); }
+.check-label { font-size: 0.9rem; color: var(--fg); }
+.check-label.done { text-decoration: line-through; color: var(--muted); }
+.check-label.urgent { color: var(--red); font-weight: 500; }
+
+/* ── Utilitaires ──────────────────────────────────────────── */
+.section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.875rem 1rem 0.5rem;
+}
+
+.empty-state {
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--subtle);
+  color: var(--muted);
+}
+
+.badge.green { background: #f0fdf4; color: var(--green); }
+.badge.red   { background: #fef2f2; color: var(--red); }
