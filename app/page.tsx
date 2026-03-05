@@ -1,7 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { Event, Habit, Chore } from "@/lib/types";
+
+const COLOR_HEX: Record<string, string> = {
+  blue: "#3b82f6", green: "#16a34a", orange: "#d97706",
+  red: "#dc2626",  purple: "#7c3aed", pink: "#db2777",
+};
+
+
+function localDateStr(d: Date) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+const CHORE_LIMIT = 5;
 
 export default function Dashboard() {
   const [events, setEvents]   = useState<Event[]>([]);
@@ -23,18 +37,29 @@ export default function Dashboard() {
   }, []);
 
   const today    = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = localDateStr(today);
 
-  const todayEvents = events.filter((e) => e.start_at.startsWith(todayStr));
-  const nextEvents  = events.filter((e) => !e.start_at.startsWith(todayStr)).slice(0, 3);
+  // Événements : aujourd'hui vs à venir
+  const todayEvents = events.filter((e) => localDateStr(new Date(e.start_at)) === todayStr);
+  const nextEvents  = events.filter((e) => localDateStr(new Date(e.start_at)) > todayStr).slice(0, 3);
 
-  // Tâches urgentes : en retard ou dues aujourd'hui, non complétées
-  const urgentChores = chores.filter((c) => {
-    if (c.done || !c.due_date) return false;
-    return c.due_date <= todayStr;
-  });
-
+  // Habitudes
   const loggedHabits = habits.filter((h) => h.logged_today).length;
+  const pct = habits.length > 0 ? Math.round((loggedHabits / habits.length) * 100) : 0;
+
+  // Tâches en attente triées par date limite (sans date à la fin)
+  const pendingChores = chores
+    .filter((c) => !c.done)
+    .sort((a, b) => {
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return a.due_date.localeCompare(b.due_date);
+    });
+
+  const overdueCount  = pendingChores.filter((c) => c.due_date && c.due_date < todayStr).length;
+  const visibleChores = pendingChores.slice(0, CHORE_LIMIT);
+  const hiddenCount   = pendingChores.length - CHORE_LIMIT;
 
   async function toggleHabit(id: string) {
     setHabits((p) => p.map((h) => h.id === id ? { ...h, logged_today: !h.logged_today } : h));
@@ -44,6 +69,16 @@ export default function Dashboard() {
   async function toggleChore(id: string) {
     setChores((p) => p.map((c) => c.id === id ? { ...c, done: !c.done } : c));
     await fetch(`/api/chores/${id}`, { method: "PATCH" });
+  }
+
+  function dueTag(due_date: string | null): { text: string; color: string; bg: string } | null {
+    if (!due_date) return null;
+    if (due_date < todayStr) return { text: "En retard", color: "var(--red)", bg: "#fef2f2" };
+    if (due_date === todayStr) return { text: "Aujourd'hui", color: "#d97706", bg: "#fff7ed" };
+    const diff = Math.ceil((new Date(due_date + "T00:00:00").getTime() - new Date(todayStr + "T00:00:00").getTime()) / 86400000);
+    const label = new Date(due_date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    if (diff <= 7) return { text: label, color: "var(--fg)", bg: "var(--subtle)" };
+    return { text: label, color: "var(--muted)", bg: "var(--subtle)" };
   }
 
   if (loading) return (
@@ -56,53 +91,71 @@ export default function Dashboard() {
 
   return (
     <div className="page">
+
       {/* ── Header ── */}
-      <div style={{ marginBottom: "1.5rem" }}>
-        <h1 style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--fg)", textTransform: "capitalize" }}>
+      <div style={{ marginBottom: "1.75rem" }}>
+        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, textTransform: "capitalize", lineHeight: 1.2 }}>
           {dateLabel}
         </h1>
-        <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.6rem", flexWrap: "wrap" }}>
           {habits.length > 0 && (
             <span className={`badge ${loggedHabits === habits.length ? "green" : ""}`}>
               {loggedHabits}/{habits.length} habitudes
             </span>
           )}
-          {urgentChores.length > 0 && (
-            <span className="badge red">{urgentChores.length} tâche{urgentChores.length > 1 ? "s" : ""} urgente{urgentChores.length > 1 ? "s" : ""}</span>
+          {overdueCount > 0 && (
+            <span className="badge red">{overdueCount} en retard</span>
           )}
-          {urgentChores.length === 0 && chores.filter(c => !c.done).length === 0 && chores.length > 0 && (
+          {overdueCount === 0 && pendingChores.length === 0 && chores.length > 0 && (
             <span className="badge green">Tout est fait !</span>
           )}
         </div>
       </div>
 
-      {/* ── Agenda du jour ── */}
+      {/* ── Agenda ── */}
       <div className="card">
-        <p className="section-title">Agenda du jour</p>
+        <div style={secHeader}>
+          <span style={secTitle}>Agenda</span>
+          <Link href="/calendar" style={secLink}>Voir tout →</Link>
+        </div>
+
         {todayEvents.length === 0 && nextEvents.length === 0 ? (
-          <p className="empty-state">Rien de prévu</p>
+          <p className="empty-state" style={{ paddingTop: "0.25rem" }}>Rien de prévu</p>
         ) : (
           <>
-            {todayEvents.map((e) => (
-              <div key={e.id} style={eRow}>
-                <span style={eTime}>
-                  {e.all_day ? "Journée" : new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                </span>
-                <span style={eTitle}>{e.title}</span>
-              </div>
-            ))}
-            {todayEvents.length === 0 && <p className="empty-state" style={{ paddingTop: 0, paddingBottom: "0.5rem", fontSize: "0.8rem" }}>Rien aujourd'hui</p>}
+            {todayEvents.length === 0 ? (
+              <p style={{ padding: "0.25rem 1rem 0.4rem", fontSize: "0.8rem", color: "var(--muted)" }}>Rien aujourd'hui</p>
+            ) : (
+              todayEvents.map((e) => {
+                const accent = COLOR_HEX[e.color ?? ""];
+                return (
+                  <div key={e.id} style={{ ...eRow, borderLeft: accent ? `3px solid ${accent}` : "3px solid transparent" }}>
+                    <span style={eTime}>
+                      {e.all_day ? "Journée" : new Date(e.start_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <div>
+                      <div style={eTitle}>{e.title}</div>
+                      {e.location && <div style={{ fontSize: "0.7rem", color: "var(--muted)", marginTop: "0.1rem" }}>📍 {e.location}</div>}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
             {nextEvents.length > 0 && (
               <>
-                <p className="section-title" style={{ paddingTop: "0.5rem" }}>À venir</p>
-                {nextEvents.map((e) => (
-                  <div key={e.id} style={{ ...eRow, opacity: 0.6 }}>
-                    <span style={eTime}>
-                      {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}
-                    </span>
-                    <span style={eTitle}>{e.title}</span>
-                  </div>
-                ))}
+                <div style={subLabel}>À venir</div>
+                {nextEvents.map((e) => {
+                  const accent = COLOR_HEX[e.color ?? ""];
+                  return (
+                    <div key={e.id} style={{ ...eRow, opacity: 0.65, borderLeft: accent ? `3px solid ${accent}` : "3px solid transparent" }}>
+                      <span style={eTime}>
+                        {new Date(e.start_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}
+                      </span>
+                      <div style={eTitle}>{e.title}</div>
+                    </div>
+                  );
+                })}
               </>
             )}
           </>
@@ -111,63 +164,118 @@ export default function Dashboard() {
 
       {/* ── Habitudes ── */}
       <div className="card">
-        <p className="section-title">
-          Habitudes
-          {habits.length > 0 && <span style={{ color: "var(--fg)", marginLeft: "0.4rem" }}>{loggedHabits}/{habits.length}</span>}
-        </p>
-        {habits.length === 0 ? (
-          <p className="empty-state"><a href="/habits" style={{ color: "var(--fg)" }}>Créer une habitude</a></p>
-        ) : (
-          habits.map((h) => (
-            <button key={h.id} className="check-row" onClick={() => toggleHabit(h.id)}>
-              <span className={`check-box ${h.logged_today ? "done" : ""}`}>{h.logged_today && "✓"}</span>
-              <span className={`check-label ${h.logged_today ? "done" : ""}`}>{h.name}</span>
-            </button>
-          ))
-        )}
-        {habits.length > 0 && (
-          <div style={{ padding: "0.5rem 1rem 0.75rem" }}>
-            <div style={{ height: "4px", background: "var(--subtle)", borderRadius: "9999px", overflow: "hidden" }}>
-              <div style={{ height: "100%", background: "var(--fg)", borderRadius: "9999px", width: `${habits.length > 0 ? (loggedHabits / habits.length) * 100 : 0}%`, transition: "width 0.3s" }} />
-            </div>
+        <div style={secHeader}>
+          <span style={secTitle}>Habitudes</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            {habits.length > 0 && (
+              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: loggedHabits === habits.length ? "var(--green)" : "var(--fg)" }}>
+                {pct}%
+              </span>
+            )}
+            <Link href="/habits" style={secLink}>Voir tout →</Link>
           </div>
+        </div>
+
+        {habits.length === 0 ? (
+          <p className="empty-state" style={{ paddingTop: "0.25rem" }}>
+            <Link href="/habits" style={{ color: "var(--fg)" }}>Créer une habitude</Link>
+          </p>
+        ) : (
+          <>
+            {habits.map((h) => {
+              const accent = COLOR_HEX[h.color ?? ""];
+              return (
+                <button
+                  key={h.id}
+                  className="check-row"
+                  onClick={() => toggleHabit(h.id)}
+                  style={{ borderLeft: accent ? `3px solid ${accent}` : "3px solid transparent" }}
+                >
+                  <span className={`check-box ${h.logged_today ? "done" : ""}`}>{h.logged_today && "✓"}</span>
+                  <span className={`check-label ${h.logged_today ? "done" : ""}`}>{h.name}</span>
+                </button>
+              );
+            })}
+            <div style={{ padding: "0.5rem 1rem 0.75rem" }}>
+              <div style={{ height: "4px", background: "var(--subtle)", borderRadius: "9999px", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  background: loggedHabits === habits.length ? "var(--green)" : "var(--fg)",
+                  width: `${pct}%`,
+                  transition: "width 0.3s",
+                  borderRadius: "9999px",
+                }} />
+              </div>
+            </div>
+          </>
         )}
       </div>
 
-      {/* ── Tâches urgentes ── */}
+      {/* ── Tâches ── */}
       <div className="card">
-        <p className="section-title">
-          Tâches urgentes
-          {urgentChores.length > 0 && <span style={{ color: "var(--red)", marginLeft: "0.4rem" }}>{urgentChores.length}</span>}
-        </p>
-        {urgentChores.length === 0 ? (
-          <p className="empty-state">
-            Aucune tâche urgente — <a href="/chores" style={{ color: "var(--fg)" }}>voir toutes les tâches</a>
+        <div style={secHeader}>
+          <span style={secTitle}>Tâches</span>
+          <Link href="/chores" style={secLink}>Voir tout →</Link>
+        </div>
+
+        {pendingChores.length === 0 ? (
+          <p className="empty-state" style={{ paddingTop: "0.25rem" }}>
+            {chores.length > 0
+              ? "Tout est fait !"
+              : <Link href="/chores" style={{ color: "var(--fg)" }}>Ajouter une tâche</Link>
+            }
           </p>
         ) : (
-          urgentChores.map((c) => {
-            const isOverdue = c.due_date! < todayStr;
-            return (
-              <button key={c.id} className="check-row" onClick={() => toggleChore(c.id)}>
-                <span className={`check-box ${c.done ? "done" : ""}`}>{c.done && "✓"}</span>
-                <div style={{ flex: 1 }}>
-                  <span className={`check-label ${c.done ? "done" : isOverdue ? "urgent" : ""}`}>{c.title}</span>
-                  {c.due_date && (
-                    <span style={{ display: "block", fontSize: "0.72rem", color: isOverdue ? "var(--red)" : "var(--muted)", marginTop: "0.1rem" }}>
-                      {isOverdue ? "En retard · " : ""}
-                      {new Date(c.due_date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })
+          <>
+            {visibleChores.map((c) => {
+              const tag = dueTag(c.due_date);
+              return (
+                <button
+                  key={c.id}
+                  className="check-row"
+                  onClick={() => toggleChore(c.id)}
+                  style={{ borderLeft: "3px solid transparent" }}
+                >
+                  <span className={`check-box ${c.done ? "done" : ""}`}>{c.done && "✓"}</span>
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <span className={`check-label${c.done ? " done" : ""}`}>{c.title}</span>
+                    {tag && (
+                      <span style={{
+                        fontSize: "0.65rem",
+                        fontWeight: 600,
+                        padding: "0.15rem 0.45rem",
+                        borderRadius: "9999px",
+                        background: tag.bg,
+                        color: tag.color,
+                        flexShrink: 0,
+                      }}>
+                        {tag.text}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+
+            {hiddenCount > 0 && (
+              <div style={{ padding: "0.625rem 1rem", borderTop: "1px solid var(--border)", textAlign: "center" }}>
+                <Link href="/chores" style={{ fontSize: "0.8rem", color: "var(--muted)", textDecoration: "none" }}>
+                  + {hiddenCount} tâche{hiddenCount > 1 ? "s" : ""} de plus
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </div>
+
     </div>
   );
 }
 
-const eRow:   React.CSSProperties = { display: "flex", gap: "0.75rem", alignItems: "center", padding: "0.5rem 1rem", borderBottom: "1px solid var(--border)" };
-const eTime:  React.CSSProperties = { fontSize: "0.75rem", color: "var(--muted)", minWidth: "4rem", flexShrink: 0 };
-const eTitle: React.CSSProperties = { fontSize: "0.9rem", fontWeight: 500 };
+const secHeader: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.75rem 1rem 0.4rem" };
+const secTitle:  React.CSSProperties = { fontSize: "0.68rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em" };
+const secLink:   React.CSSProperties = { fontSize: "0.75rem", color: "var(--muted)", textDecoration: "none" };
+const subLabel:  React.CSSProperties = { padding: "0.4rem 1rem 0.15rem", fontSize: "0.65rem", color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" };
+const eRow:      React.CSSProperties = { display: "flex", gap: "0.75rem", alignItems: "flex-start", padding: "0.5rem 1rem", borderBottom: "1px solid var(--border)", paddingLeft: "0.75rem" };
+const eTime:     React.CSSProperties = { fontSize: "0.75rem", color: "var(--muted)", minWidth: "4.5rem", flexShrink: 0, paddingTop: "0.15rem" };
+const eTitle:    React.CSSProperties = { fontSize: "0.9rem", fontWeight: 500 };
