@@ -12,12 +12,17 @@ export async function notifyAll(
   body: string
 ) {
   const { data: profiles } = await supabase.from("profiles").select("id");
+
   const ids: string[] =
     profiles && profiles.length > 0
       ? profiles.map((p: { id: string }) => p.id)
       : [fallbackUserId];
 
-  await supabase
+  const { error } = await supabase
     .from("notifications")
     .insert(ids.map((uid) => ({ user_id: uid, title, body })));
+
+  if (error) {
+    console.error("[notifyAll] Erreur insertion notifications:", error.message, { ids, title });
+  }
 }
