@@ -3,18 +3,42 @@
 // Ce fichier est servi avec Cache-Control: no-cache (voir next.config.js)
 // pour que le navigateur détecte toujours les mises à jour.
 
-const CACHE_NAME = "mimisapp-v1";
+const CACHE_NAME = "mimisapp-v2";
 
-// Assets à précacher au moment de l'installation
-const PRECACHE_ASSETS = ["/", "/offline"];
+// HTML de la page offline embarqué directement dans le SW.
+// Avantage : disponible instantanément dès l'installation, sans dépendre
+// d'une requête réseau vers /offline (qui peut échouer ou être bloquée
+// par les headers Cache-Control de Next.js).
+const OFFLINE_HTML = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hors-ligne — MimisApp</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100dvh; font-family: system-ui, -apple-system, sans-serif;
+      background: #fafafa; color: #18181b;
+    }
+    .card { text-align: center; padding: 2rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; }
+    p  { margin-top: 0.5rem; color: #71717a; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Hors-ligne</h1>
+    <p>Vérifie ta connexion et réessaie.</p>
+  </div>
+</body>
+</html>`;
 
 // ─── Installation ────────────────────────────────────────────────────────────
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS))
-  );
-  // Active immédiatement sans attendre que l'onglet soit fermé
-  self.skipWaiting();
+  // skipWaiting dans waitUntil pour s'activer dès que l'install est terminée
+  event.waitUntil(self.skipWaiting());
 });
 
 // ─── Activation ──────────────────────────────────────────────────────────────
@@ -56,7 +80,15 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() =>
-          caches.match(request).then((cached) => cached || caches.match("/offline"))
+          // Essaie d'abord le cache pour cette URL précise,
+          // puis retourne le HTML offline embarqué — toujours disponible.
+          caches.match(request).then(
+            (cached) =>
+              cached ||
+              new Response(OFFLINE_HTML, {
+                headers: { "Content-Type": "text/html; charset=utf-8" },
+              })
+          )
         )
     );
     return;
