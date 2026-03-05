@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
+import NavBar from "@/components/NavBar";
 
 // ─── Métadonnées SEO + PWA ────────────────────────────────────────────────────
 export const metadata: Metadata = {
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Enregistrement du Service Worker côté client uniquement */}
         <ServiceWorkerRegistration />
         {children}
+        <NavBar />
       </body>
     </html>
   );
