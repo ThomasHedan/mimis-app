@@ -1,0 +1,27 @@
+/* Reset minimal — aucune dépendance externe (pas de Google Fonts, pas de CDN) */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg: #ffffff;
+  --color-fg: #18181b;
+  --color-accent: #7c3aed;
+  --color-muted: #71717a;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  /* Empêche le zoom non voulu sur iOS lors du focus sur les inputs */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh; /* dvh : prend en compte la barre d'adresse mobile */
+  line-height: 1.5;
+}
