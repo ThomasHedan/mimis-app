@@ -8,7 +8,6 @@ export async function GET() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  // Récupère les habitudes et les logs du jour en parallèle
   const [{ data: habits, error }, { data: logs }] = await Promise.all([
     supabase
       .from("habits")
@@ -37,12 +36,17 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  const { name } = await request.json();
+  const { name, description, color } = await request.json();
   if (!name?.trim()) return NextResponse.json({ error: "Nom requis" }, { status: 400 });
 
   const { data, error } = await supabase
     .from("habits")
-    .insert({ name: name.trim(), user_id: user.id })
+    .insert({
+      name: name.trim(),
+      description: description?.trim() || null,
+      color: color || null,
+      user_id: user.id,
+    })
     .select()
     .single();
 

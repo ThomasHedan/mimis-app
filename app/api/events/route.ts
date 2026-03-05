@@ -8,14 +8,13 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const from = searchParams.get("from");
-  const to = searchParams.get("to");
+  const to   = searchParams.get("to");
 
   let query = supabase.from("events").select("*");
 
   if (from) {
     query = query.gte("start_at", from);
   } else {
-    // Par défaut : depuis aujourd'hui
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     query = query.gte("start_at", today.toISOString());
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   const body = await request.json();
-  const { title, description, start_at, end_at, all_day } = body;
+  const { title, description, location, color, start_at, end_at, all_day } = body;
 
   if (!title?.trim() || !start_at) {
     return NextResponse.json({ error: "Titre et date requis" }, { status: 400 });
@@ -46,6 +45,8 @@ export async function POST(request: Request) {
     .insert({
       title: title.trim(),
       description: description?.trim() || null,
+      location: location?.trim() || null,
+      color: color || null,
       start_at,
       end_at: end_at || null,
       all_day: all_day ?? false,
