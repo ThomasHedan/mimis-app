@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Routes accessibles sans session active
-const PUBLIC_PATHS = ["/login", "/offline", "/auth/callback", "/reset-password"];
+const PUBLIC_PATHS = ["/login", "/offline", "/auth/callback", "/auth/confirm", "/reset-password"];
 
 export async function proxy(request: NextRequest) {
   // On part d'une réponse "passer au suivant" que l'on enrichira si besoin
