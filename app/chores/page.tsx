@@ -132,7 +132,7 @@ export default function ChoresPage() {
             </div>
           )}
           {c.notes && !c.done && (
-            <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.2rem", lineHeight: 1.4 }}>{c.notes}</p>
+            <p style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: "0.2rem", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.notes}</p>
           )}
         </div>
 

@@ -8,11 +8,11 @@ import { createClient } from "@/lib/supabase/client";
 const HIDE_ON = ["/login", "/reset-password", "/auth/", "/offline"];
 
 const links = [
-  { href: "/",              label: "Accueil",   icon: "⊞", exact: true  },
-  { href: "/calendar",      label: "Agenda",    icon: "◷", exact: false },
-  { href: "/habits",        label: "Habitudes", icon: "✓", exact: false },
-  { href: "/chores",        label: "Tâches",    icon: "⊡", exact: false },
-  { href: "/budget",        label: "Budget",    icon: "€", exact: false },
+  { href: "/",         label: "Accueil",   icon: "⊞", exact: true  },
+  { href: "/calendar", label: "Agenda",    icon: "◷", exact: false },
+  { href: "/habits",   label: "Habitudes", icon: "✓", exact: false },
+  { href: "/chores",   label: "Tâches",    icon: "⊡", exact: false },
+  { href: "/budget",   label: "Budget",    icon: "€", exact: false },
 ];
 
 export default function NavBar() {
@@ -44,19 +44,18 @@ export default function NavBar() {
     router.push("/login");
   }
 
-  // Icône notifs avec badge
-  function NotifIcon() {
+  function BellIcon() {
     return (
-      <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>
+      <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
         ⊙
         {unreadCount > 0 && (
           <span style={{
-            position: "absolute", top: "-5px", right: "-8px",
+            position: "absolute", top: "-4px", right: "-7px",
             background: "var(--red)", color: "#fff",
             borderRadius: "9999px", fontSize: "0.5rem", fontWeight: 700,
-            minWidth: "0.9rem", height: "0.9rem",
+            minWidth: "0.85rem", height: "0.85rem",
             display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "0 0.15rem", lineHeight: 1,
+            padding: "0 0.1rem", lineHeight: 1,
           }}>
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
@@ -67,6 +66,22 @@ export default function NavBar() {
 
   return (
     <>
+      {/* ── Mobile : barre du haut ── */}
+      <div className="nav-top">
+        <span className="nav-logo">MimisApp</span>
+        <Link
+          href="/notifications"
+          style={{
+            display: "flex", alignItems: "center", gap: "0.35rem",
+            color: isNotifsActive ? "var(--fg)" : "var(--muted)",
+            textDecoration: "none", fontSize: "0.75rem", fontWeight: 500,
+          }}
+        >
+          <BellIcon />
+          {unreadCount > 0 && <span style={{ fontSize: "0.7rem" }}>Notifs</span>}
+        </Link>
+      </div>
+
       {/* ── Mobile : barre du bas ── */}
       <nav className="nav-mobile">
         {links.map((l) => (
@@ -75,10 +90,6 @@ export default function NavBar() {
             {l.label}
           </Link>
         ))}
-        <Link href="/notifications" className={isNotifsActive ? "active" : ""}>
-          <NotifIcon />
-          Notifs
-        </Link>
       </nav>
 
       {/* ── Desktop : sidebar gauche ── */}
@@ -93,7 +104,7 @@ export default function NavBar() {
         ))}
 
         <Link href="/notifications" className={isNotifsActive ? "active" : ""}>
-          <NotifIcon />
+          <BellIcon />
           Notifications
           {unreadCount > 0 && (
             <span className="badge red" style={{ fontSize: "0.6rem", marginLeft: "auto" }}>{unreadCount}</span>

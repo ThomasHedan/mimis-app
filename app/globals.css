@@ -34,9 +34,30 @@ body { min-height: 100dvh; line-height: 1.5; }
   flex: 1;
   min-width: 0;
   padding-bottom: 5rem; /* espace pour la nav mobile */
+  padding-top: 2.75rem; /* espace pour la top bar mobile */
 }
 
 /* ── Navigation ───────────────────────────────────────────── */
+.nav-top {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2.75rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  z-index: 99;
+}
+
+.nav-top .nav-logo {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+}
+
 .nav-mobile {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -112,7 +133,9 @@ body { min-height: 100dvh; line-height: 1.5; }
 
   .nav-desktop .nav-bottom { margin-top: auto; }
 
-  .app-content { padding-bottom: 2rem; }
+  .app-content { padding-bottom: 2rem; padding-top: 0; }
+
+  .nav-top { display: none; }
 }
 
 /* ── Page wrapper ─────────────────────────────────────────── */

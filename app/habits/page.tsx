@@ -19,7 +19,14 @@ const COLOR_HEX: Record<string, string> = {
   red: "#dc2626",  purple: "#7c3aed", pink: "#db2777",
 };
 
-const EMPTY_FORM = { name: "", description: "", color: "" };
+const FREQ_LABEL: Record<string, string> = {
+  daily: "Quotidien", weekly: "Hebdo", monthly: "Mensuel",
+};
+const FREQ_BADGE: Record<string, string> = {
+  weekly: "Hebdo", monthly: "Mensuel",
+};
+
+const EMPTY_FORM = { name: "", description: "", color: "", frequency: "daily" };
 
 export default function HabitsPage() {
   const [habits, setHabits]   = useState<Habit[]>([]);
@@ -43,7 +50,7 @@ export default function HabitsPage() {
   }
 
   function openEdit(h: Habit) {
-    setForm({ name: h.name, description: h.description ?? "", color: h.color ?? "" });
+    setForm({ name: h.name, description: h.description ?? "", color: h.color ?? "", frequency: h.frequency ?? "daily" });
     setModal({ open: true, editing: h });
   }
 
@@ -57,6 +64,7 @@ export default function HabitsPage() {
       name:        form.name.trim(),
       description: form.description || null,
       color:       form.color || null,
+      frequency:   form.frequency,
     };
     if (modal.editing) {
       await fetch(`/api/habits/${modal.editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -69,7 +77,7 @@ export default function HabitsPage() {
   }
 
   async function toggleHabit(id: string) {
-    setHabits((p) => p.map((h) => h.id === id ? { ...h, logged_today: !h.logged_today } : h));
+    setHabits((p) => p.map((h) => h.id === id ? { ...h, logged_period: !h.logged_period } : h));
     await fetch(`/api/habits/${id}/log`, { method: "POST" });
   }
 
@@ -78,7 +86,7 @@ export default function HabitsPage() {
     setHabits((p) => p.filter((h) => h.id !== id));
   }
 
-  const logged = habits.filter((h) => h.logged_today).length;
+  const logged = habits.filter((h) => h.logged_period).length;
   const pct    = habits.length > 0 ? Math.round((logged / habits.length) * 100) : 0;
 
   return (
@@ -95,7 +103,7 @@ export default function HabitsPage() {
         <div className="card" style={{ padding: "1rem", marginBottom: "0.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.6rem" }}>
             <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
-              {logged === habits.length ? "Toutes complétées !" : `${logged} / ${habits.length} aujourd'hui`}
+              {logged === habits.length ? "Toutes complétées !" : `${logged} / ${habits.length} complétées`}
             </span>
             <span style={{ fontSize: "1rem", fontWeight: 700, color: logged === habits.length ? "var(--green)" : "var(--fg)" }}>
               {pct}%
@@ -116,6 +124,7 @@ export default function HabitsPage() {
         <div className="card" style={{ overflow: "hidden" }}>
           {habits.map((h) => {
             const accentHex = COLOR_HEX[h.color ?? ""];
+            const freqBadge = FREQ_BADGE[h.frequency ?? "daily"];
             return (
               <div
                 key={h.id}
@@ -127,9 +136,14 @@ export default function HabitsPage() {
                 }}
               >
                 <button className="check-row" style={{ flex: 1, borderBottom: "none" }} onClick={() => toggleHabit(h.id)}>
-                  <span className={`check-box ${h.logged_today ? "done" : ""}`}>{h.logged_today && "✓"}</span>
+                  <span className={`check-box ${h.logged_period ? "done" : ""}`}>{h.logged_period && "✓"}</span>
                   <div style={{ flex: 1 }}>
-                    <span className={`check-label ${h.logged_today ? "done" : ""}`}>{h.name}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
+                      <span className={`check-label ${h.logged_period ? "done" : ""}`}>{h.name}</span>
+                      {freqBadge && (
+                        <span className="badge" style={{ fontSize: "0.6rem" }}>{freqBadge}</span>
+                      )}
+                    </div>
                     {h.description && (
                       <span style={{ display: "block", fontSize: "0.72rem", color: "var(--muted)", marginTop: "0.1rem" }}>
                         {h.description}
@@ -151,6 +165,14 @@ export default function HabitsPage() {
           <div>
             <label style={labelStyle}>Nom *</label>
             <input placeholder="Sport, méditation, lecture…" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+          </div>
+          <div>
+            <label style={labelStyle}>Fréquence</label>
+            <select value={form.frequency} onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))}>
+              <option value="daily">Quotidien</option>
+              <option value="weekly">Hebdomadaire</option>
+              <option value="monthly">Mensuel</option>
+            </select>
           </div>
           <div>
             <label style={labelStyle}>Description</label>

@@ -10,15 +10,16 @@ export async function PATCH(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  const { name, description, color } = await request.json();
+  const { name, description, color, frequency } = await request.json();
   if (!name?.trim()) return NextResponse.json({ error: "Nom requis" }, { status: 400 });
 
   const { data, error } = await supabase
     .from("habits")
     .update({
-      name: name.trim(),
+      name:        name.trim(),
       description: description?.trim() || null,
-      color: color || null,
+      color:       color || null,
+      frequency:   frequency || "daily",
     })
     .eq("id", id)
     .eq("user_id", user.id)

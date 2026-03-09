@@ -21,9 +21,10 @@ export type Habit = {
   name: string;
   description: string | null;
   color: string | null;
+  frequency: "daily" | "weekly" | "monthly";
   user_id: string;
   created_at: string;
-  logged_today?: boolean;
+  logged_period?: boolean;
 };
 
 export type Notification = {
