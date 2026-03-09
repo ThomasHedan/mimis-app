@@ -1,11 +1,15 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-webpush.setVapidDetails(
-  "mailto:contact@mimis-app.vercel.app",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-);
+let vapidReady = false;
+function ensureVapid() {
+  if (vapidReady) return;
+  const pub  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  if (!pub || !priv) throw new Error("VAPID keys not configured");
+  webpush.setVapidDetails("mailto:contact@mimis-app.vercel.app", pub, priv);
+  vapidReady = true;
+}
 
 /**
  * Envoie une notification push à tous les abonnés d'un utilisateur.
@@ -17,6 +21,7 @@ export async function sendPushToUser(
   title: string,
   body: string
 ) {
+  ensureVapid();
   const { data: subs } = await supabase
     .from("push_subscriptions")
     .select("endpoint, p256dh, auth")
@@ -56,6 +61,7 @@ export async function sendPushToAll(
   title: string,
   body: string
 ) {
+  ensureVapid();
   const { data: subs } = await supabase
     .from("push_subscriptions")
     .select("user_id, endpoint, p256dh, auth");

@@ -44,7 +44,7 @@ export default function Dashboard() {
   const nextEvents  = events.filter((e) => localDateStr(new Date(e.start_at)) > todayStr).slice(0, 3);
 
   // Habitudes
-  const loggedHabits = habits.filter((h) => h.logged_today).length;
+  const loggedHabits = habits.filter((h) => h.logged_period).length;
   const pct = habits.length > 0 ? Math.round((loggedHabits / habits.length) * 100) : 0;
 
   // Tâches en attente triées par date limite (sans date à la fin)
@@ -62,7 +62,7 @@ export default function Dashboard() {
   const hiddenCount   = pendingChores.length - CHORE_LIMIT;
 
   async function toggleHabit(id: string) {
-    setHabits((p) => p.map((h) => h.id === id ? { ...h, logged_today: !h.logged_today } : h));
+    setHabits((p) => p.map((h) => h.id === id ? { ...h, logged_period: !h.logged_period } : h));
     await fetch(`/api/habits/${id}/log`, { method: "POST" });
   }
 
@@ -191,8 +191,8 @@ export default function Dashboard() {
                   onClick={() => toggleHabit(h.id)}
                   style={{ borderLeft: accent ? `3px solid ${accent}` : "3px solid transparent" }}
                 >
-                  <span className={`check-box ${h.logged_today ? "done" : ""}`}>{h.logged_today && "✓"}</span>
-                  <span className={`check-label ${h.logged_today ? "done" : ""}`}>{h.name}</span>
+                  <span className={`check-box ${h.logged_period ? "done" : ""}`}>{h.logged_period && "✓"}</span>
+                  <span className={`check-label ${h.logged_period ? "done" : ""}`}>{h.name}</span>
                 </button>
               );
             })}
