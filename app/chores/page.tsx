@@ -4,10 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import type { Chore, Profile } from "@/lib/types";
 import Modal from "@/components/Modal";
 
-const PRIORITY_LABEL: Record<string, string> = { high: "Urgent", medium: "Normal", low: "Bas" };
-const PRIORITY_BADGE: Record<string, string> = { high: "red", medium: "", low: "" };
-
-const EMPTY_FORM = { title: "", due_date: "", assigned_to: "", priority: "medium", notes: "" };
+const EMPTY_FORM = {
+  title: "",
+  due_date: "",
+  assigned_to: [] as string[],
+  priority: "medium",
+  notes: "",
+  recurrence_value: "",
+  recurrence_unit: "",
+};
 
 export default function ChoresPage() {
   const [chores, setChores]     = useState<Chore[]>([]);
@@ -42,11 +47,13 @@ export default function ChoresPage() {
 
   function openEdit(c: Chore) {
     setForm({
-      title:       c.title,
-      due_date:    c.due_date ?? "",
-      assigned_to: c.assigned_to ?? "",
-      priority:    c.priority ?? "medium",
-      notes:       c.notes ?? "",
+      title:            c.title,
+      due_date:         c.due_date ?? "",
+      assigned_to:      c.assigned_to ?? [],
+      priority:         c.priority ?? "medium",
+      notes:            c.notes ?? "",
+      recurrence_value: c.recurrence_value?.toString() ?? "",
+      recurrence_unit:  c.recurrence_unit ?? "",
     });
     setModal({ open: true, editing: c });
   }
@@ -58,11 +65,13 @@ export default function ChoresPage() {
     if (!form.title.trim()) return;
     setSaving(true);
     const body = {
-      title:       form.title.trim(),
-      due_date:    form.due_date || null,
-      assigned_to: form.assigned_to || null,
-      priority:    form.priority,
-      notes:       form.notes || null,
+      title:            form.title.trim(),
+      due_date:         form.due_date || null,
+      assigned_to:      form.assigned_to.length > 0 ? form.assigned_to : null,
+      priority:         form.priority,
+      notes:            form.notes || null,
+      recurrence_value: form.recurrence_value ? parseInt(form.recurrence_value) : null,
+      recurrence_unit:  form.recurrence_unit || null,
     };
     if (modal.editing) {
       await fetch(`/api/chores/${modal.editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -74,9 +83,15 @@ export default function ChoresPage() {
     setSaving(false);
   }
 
-  async function toggleChore(id: string) {
-    setChores((p) => p.map((c) => c.id === id ? { ...c, done: !c.done } : c));
-    await fetch(`/api/chores/${id}`, { method: "PATCH" });
+  async function toggleChore(c: Chore) {
+    // Tâche récurrente non encore faite → la date avance côté serveur, on rafraîchit
+    if (!c.done && c.recurrence_value) {
+      await fetch(`/api/chores/${c.id}`, { method: "PATCH" });
+      await fetchChores();
+      return;
+    }
+    setChores((p) => p.map((ch) => ch.id === c.id ? { ...ch, done: !ch.done } : ch));
+    await fetch(`/api/chores/${c.id}`, { method: "PATCH" });
   }
 
   async function handleDelete(id: string) {
@@ -98,16 +113,25 @@ export default function ChoresPage() {
     return { text: date, color: "var(--muted)" };
   }
 
+  function recurrenceLabel(c: Chore) {
+    if (!c.recurrence_value || !c.recurrence_unit) return null;
+    const unit = c.recurrence_unit === "weeks"
+      ? c.recurrence_value === 1 ? "sem." : `sem.`
+      : c.recurrence_value === 1 ? "mois" : "mois";
+    return `🔁 ${c.recurrence_value} ${unit}`;
+  }
+
   function ChoreRow({ c, showActions = true }: { c: Chore; showActions?: boolean }) {
-    const due        = dueLabel(c);
-    const assignee   = c.assigned_to ? profileMap[c.assigned_to] : null;
-    const isUrgent   = due?.color === "var(--red)";
+    const due       = dueLabel(c);
+    const assignees = (c.assigned_to ?? []).map((id) => profileMap[id]).filter(Boolean);
+    const isUrgent  = due?.color === "var(--red)";
+    const recLabel  = recurrenceLabel(c);
 
     return (
       <div style={{ display: "flex", alignItems: "flex-start", borderBottom: "1px solid var(--border)", padding: "0.75rem 1rem" }}>
         {/* Checkbox */}
         <button
-          onClick={() => toggleChore(c.id)}
+          onClick={() => toggleChore(c)}
           style={{ background: "none", border: "none", cursor: "pointer", padding: "0.1rem 0.75rem 0 0", flexShrink: 0 }}
           aria-label="Cocher"
         >
@@ -115,8 +139,8 @@ export default function ChoresPage() {
         </button>
 
         {/* Contenu */}
-        <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => toggleChore(c.id)}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap", cursor: "pointer" }}>
+        <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => toggleChore(c)}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
             <span className={`check-label${c.done ? " done" : ""}${isUrgent && !c.done ? " urgent" : ""}`}>{c.title}</span>
             {!c.done && c.priority === "high" && (
               <span className="badge red" style={{ fontSize: "0.62rem" }}>Urgent</span>
@@ -124,11 +148,18 @@ export default function ChoresPage() {
             {!c.done && c.priority === "low" && (
               <span className="badge" style={{ fontSize: "0.62rem" }}>Bas</span>
             )}
+            {!c.done && recLabel && (
+              <span className="badge" style={{ fontSize: "0.62rem" }}>{recLabel}</span>
+            )}
           </div>
-          {(due || assignee) && !c.done && (
+          {(due || assignees.length > 0) && !c.done && (
             <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap", marginTop: "0.2rem" }}>
               {due && <span style={{ fontSize: "0.72rem", color: due.color }}>{due.text}</span>}
-              {assignee && <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>👤 {assignee}</span>}
+              {assignees.length > 0 && (
+                <span style={{ fontSize: "0.72rem", color: "var(--muted)" }}>
+                  👤 {assignees.join(", ")}
+                </span>
+              )}
             </div>
           )}
           {c.notes && !c.done && (
@@ -145,6 +176,15 @@ export default function ChoresPage() {
         )}
       </div>
     );
+  }
+
+  function toggleAssignee(profileId: string) {
+    setForm((f) => ({
+      ...f,
+      assigned_to: f.assigned_to.includes(profileId)
+        ? f.assigned_to.filter((id) => id !== profileId)
+        : [...f.assigned_to, profileId],
+    }));
   }
 
   return (
@@ -220,15 +260,50 @@ export default function ChoresPage() {
             </div>
           </div>
 
+          {/* Répétition */}
+          <div style={{ display: "grid", gridTemplateColumns: form.recurrence_unit ? "1fr 1fr" : "1fr", gap: "0.5rem" }}>
+            <div>
+              <label style={labelStyle}>Répétition</label>
+              <select
+                value={form.recurrence_unit}
+                onChange={(e) => setForm((f) => ({ ...f, recurrence_unit: e.target.value, recurrence_value: e.target.value ? (f.recurrence_value || "1") : "" }))}
+              >
+                <option value="">— Aucune —</option>
+                <option value="weeks">Semaine(s)</option>
+                <option value="months">Mois</option>
+              </select>
+            </div>
+            {form.recurrence_unit && (
+              <div>
+                <label style={labelStyle}>Tous les</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="52"
+                  value={form.recurrence_value}
+                  onChange={(e) => setForm((f) => ({ ...f, recurrence_value: e.target.value }))}
+                  placeholder="1"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Assignées — checkboxes */}
           {profiles.length > 0 && (
             <div>
               <label style={labelStyle}>Assignée à</label>
-              <select value={form.assigned_to} onChange={(e) => setForm((f) => ({ ...f, assigned_to: e.target.value }))}>
-                <option value="">— Personne —</option>
+              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
                 {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>{p.display_name}</option>
+                  <label key={p.id} style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.85rem", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={form.assigned_to.includes(p.id)}
+                      onChange={() => toggleAssignee(p.id)}
+                    />
+                    {p.display_name}
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
           )}
 

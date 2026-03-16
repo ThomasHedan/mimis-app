@@ -62,9 +62,11 @@ export type Chore = {
   done: boolean;
   done_at: string | null;
   due_date: string | null;
-  assigned_to: string | null;
+  assigned_to: string[] | null;
   priority: "low" | "medium" | "high";
   notes: string | null;
+  recurrence_value: number | null;
+  recurrence_unit: "weeks" | "months" | null;
   created_by: string;
   created_at: string;
 };

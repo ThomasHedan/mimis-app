@@ -1,6 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
+function advanceDate(dueDateStr: string | null, value: number, unit: string): string {
+  const base = dueDateStr ? new Date(dueDateStr + "T00:00:00") : new Date();
+  if (unit === "weeks") base.setDate(base.getDate() + value * 7);
+  else if (unit === "months") base.setMonth(base.getMonth() + value);
+  return base.toISOString().split("T")[0];
+}
+
 // Toggle done / not done
 export async function PATCH(
   _request: Request,
@@ -13,12 +20,24 @@ export async function PATCH(
 
   const { data: current } = await supabase
     .from("chores")
-    .select("done")
+    .select("done, due_date, recurrence_value, recurrence_unit")
     .eq("id", id)
     .single();
 
-  const newDone = !current?.done;
+  // Tâche récurrente cochée → avancer la date, ne pas marquer done
+  if (!current?.done && current?.recurrence_value && current?.recurrence_unit) {
+    const nextDate = advanceDate(current.due_date, current.recurrence_value, current.recurrence_unit);
+    const { data, error } = await supabase
+      .from("chores")
+      .update({ due_date: nextDate })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data);
+  }
 
+  const newDone = !current?.done;
   const { data, error } = await supabase
     .from("chores")
     .update({ done: newDone, done_at: newDone ? new Date().toISOString() : null })
@@ -40,7 +59,7 @@ export async function PUT(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  const { title, due_date, assigned_to, priority, notes } = await request.json();
+  const { title, due_date, assigned_to, priority, notes, recurrence_value, recurrence_unit } = await request.json();
   if (!title?.trim()) return NextResponse.json({ error: "Titre requis" }, { status: 400 });
 
   const { data, error } = await supabase
@@ -48,9 +67,11 @@ export async function PUT(
     .update({
       title: title.trim(),
       due_date: due_date || null,
-      assigned_to: assigned_to || null,
+      assigned_to: Array.isArray(assigned_to) && assigned_to.length > 0 ? assigned_to : null,
       priority: priority || "medium",
       notes: notes?.trim() || null,
+      recurrence_value: recurrence_value || null,
+      recurrence_unit: recurrence_unit || null,
     })
     .eq("id", id)
     .select()
