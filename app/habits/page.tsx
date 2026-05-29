@@ -31,6 +31,7 @@ const EMPTY_FORM = { name: "", description: "", color: "", frequency: "daily" };
 export default function HabitsPage() {
   const [habits, setHabits]   = useState<Habit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [modal, setModal]     = useState<{ open: boolean; editing: Habit | null }>({ open: false, editing: null });
   const [form, setForm]       = useState(EMPTY_FORM);
   const [saving, setSaving]   = useState(false);
@@ -38,9 +39,15 @@ export default function HabitsPage() {
   useEffect(() => { fetchHabits(); }, []);
 
   async function fetchHabits() {
-    const r = await fetch("/api/habits");
-    const data = await r.json();
-    setHabits(Array.isArray(data) ? data : []);
+    setFetchError(null);
+    try {
+      const r = await fetch("/api/habits");
+      const data = await r.json();
+      if (!r.ok) { setFetchError(data?.error ?? "Erreur serveur"); setLoading(false); return; }
+      setHabits(Array.isArray(data) ? data : []);
+    } catch {
+      setFetchError("Impossible de charger les habitudes.");
+    }
     setLoading(false);
   }
 
@@ -118,6 +125,8 @@ export default function HabitsPage() {
       {/* ── Liste ── */}
       {loading ? (
         <p className="empty-state">Chargement…</p>
+      ) : fetchError ? (
+        <p className="empty-state" style={{ color: "var(--red, #dc2626)" }}>{fetchError}</p>
       ) : habits.length === 0 ? (
         <p className="empty-state">Aucune habitude — ajoute-en une !</p>
       ) : (
