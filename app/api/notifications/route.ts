@@ -1,46 +1,53 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { query, queryOne } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
+import { serverError, unauthorized } from "@/lib/http";
+import type { Notification } from "@/lib/types";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(request.url);
 
-  // Mode count uniquement (pour le badge NavBar)
-  if (searchParams.get("count") === "true") {
-    const { count } = await supabase
-      .from("notifications")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("read", false);
-    return NextResponse.json({ count: count ?? 0 });
+    // Mode count uniquement (pour le badge NavBar)
+    if (searchParams.get("count") === "true") {
+      const row = await queryOne<{ count: number }>(
+        "SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND NOT read",
+        [user.id]
+      );
+      return NextResponse.json({ count: row?.count ?? 0 });
+    }
+
+    // Liste complète
+    const notifications = await query<Notification>(
+      `SELECT * FROM notifications
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 50`,
+      [user.id]
+    );
+
+    return NextResponse.json(notifications);
+  } catch (error) {
+    return serverError("notifications/GET", error);
   }
-
-  // Liste complète
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
 }
 
 // Marquer toutes les notifications comme lues
 export async function PATCH() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  await supabase
-    .from("notifications")
-    .update({ read: true })
-    .eq("user_id", user.id)
-    .eq("read", false);
+    await query(
+      "UPDATE notifications SET read = true WHERE user_id = $1 AND NOT read",
+      [user.id]
+    );
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return serverError("notifications/PATCH", error);
+  }
 }

@@ -1,16 +1,20 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { query } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
+import { serverError, unauthorized } from "@/lib/http";
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const { id } = await params;
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { error } = await supabase.from("budget_entries").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+    await query("DELETE FROM budget_entries WHERE id = $1", [id]);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return serverError("budget/entries/[id]/DELETE", error);
+  }
 }

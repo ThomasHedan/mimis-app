@@ -1,36 +1,49 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { query } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
+import { badRequest, serverError, unauthorized } from "@/lib/http";
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { endpoint, p256dh, auth } = await request.json();
-  if (!endpoint || !p256dh || !auth) {
-    return NextResponse.json({ error: "Données manquantes" }, { status: 400 });
-  }
+    const { endpoint, p256dh, auth } = await request.json();
+    if (!endpoint || !p256dh || !auth) return badRequest("Données manquantes");
 
-  // Upsert : si l'endpoint existe déjà, on met à jour
-  const { error } = await supabase
-    .from("push_subscriptions")
-    .upsert(
-      { user_id: user.id, endpoint, p256dh, auth },
-      { onConflict: "endpoint" }
+    // Upsert : si l'endpoint existe déjà, on met à jour (l'appareil a pu
+    // changer de main entre les deux comptes).
+    await query(
+      `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (endpoint)
+       DO UPDATE SET user_id = EXCLUDED.user_id,
+                     p256dh  = EXCLUDED.p256dh,
+                     auth    = EXCLUDED.auth`,
+      [user.id, endpoint, p256dh, auth]
     );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return serverError("push/subscribe/POST", error);
+  }
 }
 
 export async function DELETE(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { endpoint } = await request.json();
-  if (!endpoint) return NextResponse.json({ error: "Endpoint requis" }, { status: 400 });
+    const { endpoint } = await request.json();
+    if (!endpoint) return badRequest("Endpoint requis");
 
-  await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint).eq("user_id", user.id);
-  return NextResponse.json({ ok: true });
+    await query(
+      "DELETE FROM push_subscriptions WHERE endpoint = $1 AND user_id = $2",
+      [endpoint, user.id]
+    );
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return serverError("push/subscribe/DELETE", error);
+  }
 }

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { logout } from "@/lib/logout";
 
-const HIDE_ON = ["/login", "/reset-password", "/auth/", "/offline"];
+const HIDE_ON = ["/login", "/offline"];
 
 const links = [
   { href: "/",         label: "Accueil",   icon: "⊞", exact: true  },
@@ -38,8 +38,7 @@ export default function NavBar() {
   const isNotifsActive = pathname.startsWith("/notifications");
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await logout();
     router.refresh();
     router.push("/login");
   }

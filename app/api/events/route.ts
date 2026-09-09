@@ -1,68 +1,82 @@
-import { createClient } from "@/lib/supabase/server";
-import { notifyAll } from "@/lib/notifyAll";
 import { NextResponse } from "next/server";
+import { query, queryOne } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
+import { notifyAll } from "@/lib/notifyAll";
+import { badRequest, serverError, unauthorized } from "@/lib/http";
+import type { Event } from "@/lib/types";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { searchParams } = new URL(request.url);
-  const from = searchParams.get("from");
-  const to   = searchParams.get("to");
+    const { searchParams } = new URL(request.url);
+    const from = searchParams.get("from");
+    const to   = searchParams.get("to");
 
-  let query = supabase.from("events").select("*");
-
-  if (from) {
-    query = query.gte("start_at", from);
-  } else {
+    // Par défaut : à partir d'aujourd'hui minuit.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    query = query.gte("start_at", today.toISOString());
+
+    const conditions = ["start_at >= $1"];
+    const params: unknown[] = [from ?? today.toISOString()];
+
+    if (to) {
+      params.push(to);
+      conditions.push(`start_at <= $${params.length}`);
+    }
+
+    const events = await query<Event>(
+      `SELECT * FROM events
+        WHERE ${conditions.join(" AND ")}
+        ORDER BY start_at ASC
+        LIMIT 100`,
+      params
+    );
+
+    return NextResponse.json(events);
+  } catch (error) {
+    return serverError("events/GET", error);
   }
-
-  if (to) query = query.lte("start_at", to);
-
-  const { data, error } = await query.order("start_at", { ascending: true }).limit(100);
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const body = await request.json();
-  const { title, description, location, color, start_at, end_at, all_day } = body;
+    const { title, description, location, color, start_at, end_at, all_day } =
+      await request.json();
 
-  if (!title?.trim() || !start_at) {
-    return NextResponse.json({ error: "Titre et date requis" }, { status: 400 });
+    if (!title?.trim() || !start_at) return badRequest("Titre et date requis");
+
+    const event = await queryOne<Event>(
+      `INSERT INTO events (title, description, location, color, start_at, end_at, all_day, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        title.trim(),
+        description?.trim() || null,
+        location?.trim() || null,
+        color || null,
+        start_at,
+        end_at || null,
+        all_day ?? false,
+        user.id,
+      ]
+    );
+
+    // Notification pour tous
+    const dateLabel = new Date(start_at).toLocaleDateString("fr-FR", {
+      weekday: "short", day: "numeric", month: "short",
+    });
+    await notifyAll(
+      "Nouvel événement",
+      `• ${event!.title} — ${dateLabel}${location ? ` · ${location}` : ""}`
+    );
+
+    return NextResponse.json(event, { status: 201 });
+  } catch (error) {
+    return serverError("events/POST", error);
   }
-
-  const { data, error } = await supabase
-    .from("events")
-    .insert({
-      title: title.trim(),
-      description: description?.trim() || null,
-      location: location?.trim() || null,
-      color: color || null,
-      start_at,
-      end_at: end_at || null,
-      all_day: all_day ?? false,
-      created_by: user.id,
-    })
-    .select()
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Notification pour tous
-  const dateLabel = new Date(start_at).toLocaleDateString("fr-FR", {
-    weekday: "short", day: "numeric", month: "short",
-  });
-  await notifyAll(supabase, user.id, "Nouvel événement", `• ${data.title} — ${dateLabel}${location ? ` · ${location}` : ""}`);
-
-  return NextResponse.json(data, { status: 201 });
 }

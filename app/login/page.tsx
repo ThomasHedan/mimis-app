@@ -1,20 +1,14 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-// Composant interne qui lit les searchParams — doit être dans un Suspense
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const linkError = searchParams.get("error") === "invalid_link";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(
-    linkError ? "Lien invalide ou expiré. Demande un nouveau lien de réinitialisation." : null
-  );
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -22,12 +16,23 @@ function LoginForm() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // La session est posée par le serveur dans un cookie httpOnly : le
+    // navigateur n'a aucun jeton à stocker lui-même.
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (error) {
-      // Message volontairement générique : ne révèle pas si l'email existe
-      setError("Identifiants incorrects. Vérifie ton email et mot de passe.");
+      if (!res.ok) {
+        // Message volontairement générique : ne révèle pas si l'email existe
+        setError("Identifiants incorrects. Vérifie ton email et mot de passe.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Connexion impossible. Vérifie ta connexion internet.");
       setLoading(false);
       return;
     }
@@ -79,15 +84,6 @@ function LoginForm() {
         </form>
       </div>
     </main>
-  );
-}
-
-// Page exportée — enveloppe LoginForm dans Suspense (requis par useSearchParams)
-export default function LoginPage() {
-  return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
   );
 }
 

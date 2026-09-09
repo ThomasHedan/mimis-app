@@ -1,16 +1,20 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/server";
+import { getUsers, toPublicUser } from "@/lib/auth/users";
+import { serverError, unauthorized } from "@/lib/http";
 
+// Les "profils" ne viennent plus d'une table mais de la variable APP_USERS.
+// Seuls id et display_name sortent — ni email ni hash de mot de passe.
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    if (!(await getCurrentUser())) return unauthorized();
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, display_name")
-    .order("display_name");
+    const profiles = getUsers()
+      .map(toPublicUser)
+      .sort((a, b) => a.display_name.localeCompare(b.display_name, "fr"));
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+    return NextResponse.json(profiles);
+  } catch (error) {
+    return serverError("profiles", error);
+  }
 }
