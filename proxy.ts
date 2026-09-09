@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session";
 
 // Routes accessibles sans session active
-const PUBLIC_PATHS = ["/login", "/offline", "/api/auth/login"];
+const PUBLIC_PATHS = ["/login", "/offline", "/api/auth/login", "/api/health"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

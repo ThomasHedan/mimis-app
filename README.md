@@ -56,6 +56,22 @@ npm install
 npm run dev
 ```
 
+## Vérifier que le déploiement est bien branché
+
+Un build Vercel réussi ne prouve rien : les variables d'environnement ne sont
+lues qu'à la première requête, donc l'app se déploie sans broncher même mal
+configurée. Pour savoir où on en est, ouvrir :
+
+```
+https://<ton-app>.vercel.app/api/health
+```
+
+Cette route est accessible sans connexion (c'est justement quand la connexion
+ne marche pas qu'elle sert) et ne renvoie aucune valeur de secret — seulement
+des états. Elle répond 200 quand tout est en place, 503 sinon, en nommant ce
+qui manque : variable absente, base injoignable, schéma pas encore exécuté,
+hash de mot de passe malformé.
+
 ## Résumé quotidien
 
 `.github/workflows/daily-summary.yml` appelle `/api/cron/daily-summary` à 18h
