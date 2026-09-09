@@ -13,13 +13,17 @@ variable — d'où leur type `text` et non `uuid`.
 
 ## Créer le schéma
 
-1. Créer un projet sur [neon.tech](https://neon.tech) — ou passer par
-   Vercel → Storage → Neon, ce qui renseigne `DATABASE_URL` automatiquement.
-2. Ouvrir le **SQL Editor** du dashboard Neon.
-3. Coller le contenu de `schema.sql` et exécuter.
+Rien à faire : l'app applique son schéma toute seule à la première requête,
+quand elle voit que les tables manquent. Il suffit que `DATABASE_URL` pointe
+sur une base vide et que son utilisateur ait le droit de créer des tables —
+c'est le cas par défaut sur Neon.
 
-`schema.sql` est idempotent (`CREATE TABLE IF NOT EXISTS`) : le rejouer ne
-casse rien.
+Le SQL est dans [`schema.ts`](schema.ts), en clair. Pour l'exécuter à la main
+plutôt qu'automatiquement, le coller dans le **SQL Editor** du dashboard Neon :
+toutes les instructions sont en `IF NOT EXISTS`, les rejouer ne casse rien.
+
+Pour créer la base : un projet sur [neon.tech](https://neon.tech), ou
+Vercel → Storage → Neon, ce qui renseigne `DATABASE_URL` automatiquement.
 
 ## Reprendre les données de Supabase
 

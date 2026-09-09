@@ -23,8 +23,9 @@ Conséquences à connaître :
 
 ### 1. Base de données
 
-Voir [`db/README.md`](db/README.md) : créer un projet Neon, exécuter
-`db/schema.sql`, récupérer la chaîne de connexion.
+Créer un projet Neon — le plus simple depuis Vercel → Storage, qui renseigne
+`DATABASE_URL` tout seul. Les tables sont créées automatiquement au premier
+appel ; voir [`db/README.md`](db/README.md).
 
 ### 2. Générer les hash de mots de passe
 

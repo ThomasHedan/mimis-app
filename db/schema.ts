@@ -1,10 +1,25 @@
+// Schéma de la base — source unique de vérité.
+//
+// L'app applique ce schéma toute seule à la première requête si les tables
+// n'existent pas encore (voir lib/db.ts) : il n'y a rien à exécuter à la main
+// pour démarrer. Le SQL reste lisible ici, et peut être collé tel quel dans
+// l'éditeur SQL de Neon si on préfère le faire soi-même.
+//
+// Toutes les instructions sont en IF NOT EXISTS : les rejouer ne casse rien.
+
+/** Tables que le schéma doit produire — sert à vérifier qu'il est complet. */
+export const SCHEMA_TABLES = [
+  "events", "habits", "habit_logs", "chores",
+  "budget_categories", "budget_entries", "notifications", "push_subscriptions",
+] as const;
+
+export const SCHEMA_SQL = `
 -- Schéma MimisApp — Postgres (Neon).
--- À exécuter une fois dans la console SQL Neon.
 --
 -- Il n'y a volontairement PAS de table d'utilisateurs : les deux comptes sont
 -- déclarés dans la variable d'environnement APP_USERS. Les colonnes
--- created_by / user_id / assigned_to stockent l'`id` défini dans cette
--- variable — d'où leur type `text` et non `uuid`.
+-- created_by / user_id / assigned_to stockent l'\`id\` défini dans cette
+-- variable — d'où leur type \`text\` et non \`uuid\`.
 
 CREATE TABLE IF NOT EXISTS events (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -103,3 +118,4 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON push_subscriptions (user_id);
+`;

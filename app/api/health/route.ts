@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getUsers } from "@/lib/auth/users";
+import { SCHEMA_TABLES } from "@/db/schema";
 
 // Diagnostic de configuration : dit si l'app est correctement branchée sur sa
 // base et si les variables d'environnement attendues sont présentes.
@@ -11,11 +12,6 @@ import { getUsers } from "@/lib/auth/users";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const TABLES_ATTENDUES = [
-  "events", "habits", "habit_logs", "chores",
-  "budget_categories", "budget_entries", "notifications", "push_subscriptions",
-];
-
 /** Ramène une erreur Postgres à une cause lisible, sans divulguer le détail. */
 function diagnostiquer(error: unknown): string {
   const err = error as { code?: string; message?: string };
@@ -23,6 +19,9 @@ function diagnostiquer(error: unknown): string {
 
   if (err.code === "28P01" || /password authentication/i.test(message)) {
     return "identifiants refusés par la base — vérifie DATABASE_URL";
+  }
+  if (err.code === "42501" || /permission denied/i.test(message)) {
+    return "l'utilisateur de DATABASE_URL n'a pas les droits sur le schéma public";
   }
   if (err.code === "3D000") {
     return "la base nommée dans DATABASE_URL n'existe pas";
@@ -93,13 +92,15 @@ export async function GET() {
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
       );
       const noms = new Set(presentes.map((t) => t.table_name));
-      const manquantes = TABLES_ATTENDUES.filter((t) => !noms.has(t));
+      const manquantes = SCHEMA_TABLES.filter((t) => !noms.has(t));
 
       if (manquantes.length > 0) {
-        tables = `manquantes : ${manquantes.join(", ")} — exécute db/schema.sql`;
+        // L'app crée ses tables toute seule au premier appel : en arriver là
+        // signifie que la création a échoué, en général faute de droits.
+        tables = `manquantes : ${manquantes.join(", ")} — la création automatique a échoué, vérifie que l'utilisateur de DATABASE_URL a le droit de créer des tables`;
         problemes.push("schéma incomplet");
       } else {
-        tables = `ok — les ${TABLES_ATTENDUES.length} tables sont présentes`;
+        tables = `ok — les ${SCHEMA_TABLES.length} tables sont présentes`;
       }
     } catch (error) {
       console.error("[health] échec base:", error);
