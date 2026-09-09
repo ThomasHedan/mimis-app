@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import Modal from "@/components/Modal";
+import { logout } from "@/lib/logout";
 
-const HIDE_ON = ["/login", "/reset-password", "/auth/", "/offline"];
+const HIDE_ON = ["/login", "/offline"];
 
 const links = [
   { href: "/",         label: "Accueil",   icon: "⊞", exact: true  },
@@ -19,6 +20,7 @@ export default function NavBar() {
   const pathname = usePathname();
   const router   = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const hidden = HIDE_ON.some((p) => pathname.startsWith(p));
 
@@ -38,8 +40,8 @@ export default function NavBar() {
   const isNotifsActive = pathname.startsWith("/notifications");
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    setConfirmLogout(false);
+    await logout();
     router.refresh();
     router.push("/login");
   }
@@ -69,17 +71,35 @@ export default function NavBar() {
       {/* ── Mobile : barre du haut ── */}
       <div className="nav-top">
         <span className="nav-logo">MimisApp</span>
-        <Link
-          href="/notifications"
-          style={{
-            display: "flex", alignItems: "center", gap: "0.35rem",
-            color: isNotifsActive ? "var(--fg)" : "var(--muted)",
-            textDecoration: "none", fontSize: "0.75rem", fontWeight: 500,
-          }}
-        >
-          <BellIcon />
-          {unreadCount > 0 && <span style={{ fontSize: "0.7rem" }}>Notifs</span>}
-        </Link>
+        <div style={{ display: "flex", alignItems: "center", gap: "1.1rem" }}>
+          <Link
+            href="/notifications"
+            style={{
+              display: "flex", alignItems: "center", gap: "0.35rem",
+              color: isNotifsActive ? "var(--fg)" : "var(--muted)",
+              textDecoration: "none", fontSize: "0.75rem", fontWeight: 500,
+            }}
+          >
+            <BellIcon />
+            {unreadCount > 0 && <span style={{ fontSize: "0.7rem" }}>Notifs</span>}
+          </Link>
+          <button
+            onClick={() => setConfirmLogout(true)}
+            aria-label="Se déconnecter"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "none", border: "none", padding: 0,
+              // 44 px : cible tactile minimale confortable au doigt. La barre
+              // ne fait que 2,75 rem de haut, on déborde donc en marge
+              // négative plutôt que de l'agrandir.
+              minWidth: "44px", height: "44px", margin: "0 -0.5rem 0 0",
+              color: "var(--muted)", fontSize: "1.1rem", cursor: "pointer",
+              fontFamily: "var(--font)", lineHeight: 1,
+            }}
+          >
+            →
+          </button>
+        </div>
       </div>
 
       {/* ── Mobile : barre du bas ── */}
@@ -113,7 +133,7 @@ export default function NavBar() {
 
         <div className="nav-bottom">
           <button
-            onClick={handleLogout}
+            onClick={() => setConfirmLogout(true)}
             style={{
               display: "flex", alignItems: "center", gap: "0.6rem",
               padding: "0.6rem 0.75rem", borderRadius: "0.5rem",
@@ -127,6 +147,28 @@ export default function NavBar() {
           </button>
         </div>
       </nav>
+
+      <Modal
+        open={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
+        title="Se déconnecter ?"
+      >
+        <p style={{ color: "var(--muted)", fontSize: "0.9rem", marginBottom: "1.25rem" }}>
+          Il faudra ressaisir l&apos;email et le mot de passe pour revenir.
+        </p>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button className="btn" onClick={handleLogout} style={{ flex: 1 }}>
+            Oui, me déconnecter
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setConfirmLogout(false)}
+            style={{ flex: 1 }}
+          >
+            Annuler
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }

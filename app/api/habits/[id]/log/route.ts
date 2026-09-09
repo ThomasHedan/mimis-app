@@ -1,5 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { query, queryOne } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
+import { notFound, serverError, unauthorized } from "@/lib/http";
 
 function getMonday(d: Date): string {
   const day = d.getDay();
@@ -14,49 +16,51 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const { id } = await params;
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const now   = new Date();
-  const today = now.toISOString().split("T")[0];
+    const now   = new Date();
+    const today = now.toISOString().split("T")[0];
 
-  // Fetch the habit to know its frequency
-  const { data: habit } = await supabase
-    .from("habits")
-    .select("frequency")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+    const habit = await queryOne<{ frequency: string }>(
+      "SELECT frequency FROM habits WHERE id = $1 AND user_id = $2",
+      [id, user.id]
+    );
+    if (!habit) return notFound();
 
-  if (!habit) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+    const freq = habit.frequency ?? "daily";
 
-  const freq = habit.frequency ?? "daily";
+    // Début de la période courante, pour retrouver une coche existante
+    let periodStart = today;
+    if (freq === "weekly")  periodStart = getMonday(now);
+    if (freq === "monthly") periodStart = today.slice(0, 7) + "-01";
 
-  // Determine the start of the current period to search for existing logs
-  let periodStart = today;
-  if (freq === "weekly")  periodStart = getMonday(now);
-  if (freq === "monthly") periodStart = today.slice(0, 7) + "-01";
+    const existing = await queryOne<{ id: string }>(
+      `SELECT id FROM habit_logs
+        WHERE habit_id = $1 AND user_id = $2 AND logged_date >= $3
+        ORDER BY logged_date DESC
+        LIMIT 1`,
+      [id, user.id, periodStart]
+    );
 
-  const { data: existing } = await supabase
-    .from("habit_logs")
-    .select("id")
-    .eq("habit_id", id)
-    .eq("user_id", user.id)
-    .gte("logged_date", periodStart)
-    .order("logged_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    if (existing) {
+      await query("DELETE FROM habit_logs WHERE id = $1", [existing.id]);
+      return NextResponse.json({ logged: false });
+    }
 
-  if (existing) {
-    await supabase.from("habit_logs").delete().eq("id", existing.id);
-    return NextResponse.json({ logged: false });
+    // ON CONFLICT : deux clics simultanés ne doivent pas lever sur la
+    // contrainte d'unicité (habit_id, logged_date).
+    await query(
+      `INSERT INTO habit_logs (habit_id, user_id, logged_date)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (habit_id, logged_date) DO NOTHING`,
+      [id, user.id, today]
+    );
+
+    return NextResponse.json({ logged: true });
+  } catch (error) {
+    return serverError("habits/[id]/log/POST", error);
   }
-
-  await supabase
-    .from("habit_logs")
-    .insert({ habit_id: id, user_id: user.id, logged_date: today });
-
-  return NextResponse.json({ logged: true });
 }

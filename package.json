@@ -6,14 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "hash-password": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/hash-password.mjs"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.9.0",
-    "@supabase/supabase-js": "^2.98.0",
+    "@neondatabase/serverless": "^1.1.0",
     "next": "^16.1.6",
     "react": "^18",
     "react-dom": "^18",
+    "scrypt-js": "^3.0.1",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

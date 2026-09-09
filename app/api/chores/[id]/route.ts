@@ -1,5 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { query, queryOne } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
+import { badRequest, notFound, serverError, unauthorized } from "@/lib/http";
+import type { Chore } from "@/lib/types";
 
 function advanceDate(dueDateStr: string | null, value: number, unit: string): string {
   const base = dueDateStr ? new Date(dueDateStr + "T00:00:00") : new Date();
@@ -13,40 +16,42 @@ export async function PATCH(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const { id } = await params;
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { data: current } = await supabase
-    .from("chores")
-    .select("done, due_date, recurrence_value, recurrence_unit")
-    .eq("id", id)
-    .single();
+    const current = await queryOne<Pick<Chore, "done" | "due_date" | "recurrence_value" | "recurrence_unit">>(
+      "SELECT done, due_date, recurrence_value, recurrence_unit FROM chores WHERE id = $1",
+      [id]
+    );
 
-  // Tâche récurrente cochée → avancer la date, ne pas marquer done
-  if (!current?.done && current?.recurrence_value && current?.recurrence_unit) {
-    const nextDate = advanceDate(current.due_date, current.recurrence_value, current.recurrence_unit);
-    const { data, error } = await supabase
-      .from("chores")
-      .update({ due_date: nextDate })
-      .eq("id", id)
-      .select()
-      .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data);
+    if (!current) return notFound();
+
+    // Tâche récurrente cochée → avancer la date, ne pas marquer done
+    if (!current.done && current.recurrence_value && current.recurrence_unit) {
+      const nextDate = advanceDate(
+        current.due_date,
+        current.recurrence_value,
+        current.recurrence_unit
+      );
+      const updated = await queryOne<Chore>(
+        "UPDATE chores SET due_date = $1 WHERE id = $2 RETURNING *",
+        [nextDate, id]
+      );
+      return NextResponse.json(updated);
+    }
+
+    const newDone = !current.done;
+    const updated = await queryOne<Chore>(
+      "UPDATE chores SET done = $1, done_at = $2 WHERE id = $3 RETURNING *",
+      [newDone, newDone ? new Date().toISOString() : null, id]
+    );
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    return serverError("chores/[id]/PATCH", error);
   }
-
-  const newDone = !current?.done;
-  const { data, error } = await supabase
-    .from("chores")
-    .update({ done: newDone, done_at: newDone ? new Date().toISOString() : null })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
 }
 
 // Mise à jour complète
@@ -54,43 +59,53 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const { id } = await params;
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { title, due_date, assigned_to, priority, notes, recurrence_value, recurrence_unit } = await request.json();
-  if (!title?.trim()) return NextResponse.json({ error: "Titre requis" }, { status: 400 });
+    const { title, due_date, assigned_to, priority, notes, recurrence_value, recurrence_unit } =
+      await request.json();
 
-  const { data, error } = await supabase
-    .from("chores")
-    .update({
-      title: title.trim(),
-      due_date: due_date || null,
-      assigned_to: Array.isArray(assigned_to) && assigned_to.length > 0 ? assigned_to : null,
-      priority: priority || "medium",
-      notes: notes?.trim() || null,
-      recurrence_value: recurrence_value || null,
-      recurrence_unit: recurrence_unit || null,
-    })
-    .eq("id", id)
-    .select()
-    .single();
+    if (!title?.trim()) return badRequest("Titre requis");
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+    const chore = await queryOne<Chore>(
+      `UPDATE chores
+          SET title = $1, due_date = $2, assigned_to = $3, priority = $4,
+              notes = $5, recurrence_value = $6, recurrence_unit = $7
+        WHERE id = $8
+        RETURNING *`,
+      [
+        title.trim(),
+        due_date || null,
+        Array.isArray(assigned_to) && assigned_to.length > 0 ? assigned_to : null,
+        priority || "medium",
+        notes?.trim() || null,
+        recurrence_value || null,
+        recurrence_unit || null,
+        id,
+      ]
+    );
+
+    if (!chore) return notFound();
+    return NextResponse.json(chore);
+  } catch (error) {
+    return serverError("chores/[id]/PUT", error);
+  }
 }
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const { id } = await params;
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { error } = await supabase.from("chores").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+    await query("DELETE FROM chores WHERE id = $1", [id]);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return serverError("chores/[id]/DELETE", error);
+  }
 }

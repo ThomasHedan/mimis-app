@@ -1,33 +1,31 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { query } from "@/lib/db";
+import { getUsers } from "@/lib/auth/users";
 import { sendPushToAll } from "@/lib/webpush";
 
 /**
- * Insère une notification pour tous les utilisateurs (via la table profiles)
+ * Insère une notification pour chaque utilisateur déclaré dans APP_USERS
  * et envoie un push web à tous les abonnés.
- * Si profiles est vide ou inaccessible, notifie au moins le créateur.
+ *
+ * Ne lève jamais : une notification qui échoue ne doit pas faire échouer
+ * la création de la tâche ou de l'événement qui l'a déclenchée.
  */
-export async function notifyAll(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any, any, any>,
-  fallbackUserId: string,
-  title: string,
-  body: string
-) {
-  const { data: profiles } = await supabase.from("profiles").select("id");
+export async function notifyAll(title: string, body: string) {
+  try {
+    const ids = getUsers().map((u) => u.id);
 
-  const ids: string[] =
-    profiles && profiles.length > 0
-      ? profiles.map((p: { id: string }) => p.id)
-      : [fallbackUserId];
-
-  const { error } = await supabase
-    .from("notifications")
-    .insert(ids.map((uid) => ({ user_id: uid, title, body })));
-
-  if (error) {
-    console.error("[notifyAll] Erreur insertion notifications:", error.message, { ids, title });
+    // unnest() : une seule requête pour insérer une ligne par utilisateur.
+    await query(
+      `INSERT INTO notifications (user_id, title, body)
+       SELECT unnest($1::text[]), $2, $3`,
+      [ids, title, body]
+    );
+  } catch (error) {
+    console.error("[notifyAll] Erreur insertion notifications:", error);
   }
 
-  // Envoi des push web
-  await sendPushToAll(supabase, title, body);
+  try {
+    await sendPushToAll(title, body);
+  } catch (error) {
+    console.error("[notifyAll] Erreur envoi push:", error);
+  }
 }

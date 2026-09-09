@@ -1,55 +1,70 @@
-import { createClient } from "@/lib/supabase/server";
-import { notifyAll } from "@/lib/notifyAll";
 import { NextResponse } from "next/server";
+import { query, queryOne } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
+import { notifyAll } from "@/lib/notifyAll";
+import { badRequest, serverError, unauthorized } from "@/lib/http";
+import type { Chore } from "@/lib/types";
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { data, error } = await supabase
-    .from("chores")
-    .select("*")
-    .order("done", { ascending: true })
-    .order("priority", { ascending: false })
-    .order("created_at", { ascending: false });
+    // Les tâches à faire d'abord, puis par priorité décroissante.
+    // `priority` est textuel : on le projette sur un rang pour trier
+    // high > medium > low plutôt qu'alphabétiquement.
+    const chores = await query<Chore>(
+      `SELECT * FROM chores
+        ORDER BY done ASC,
+                 CASE priority WHEN 'high' THEN 3 WHEN 'medium' THEN 2 ELSE 1 END DESC,
+                 created_at DESC`
+    );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+    return NextResponse.json(chores);
+  } catch (error) {
+    return serverError("chores/GET", error);
+  }
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { title, due_date, assigned_to, priority, notes, recurrence_value, recurrence_unit } = await request.json();
-  if (!title?.trim()) return NextResponse.json({ error: "Titre requis" }, { status: 400 });
+    const { title, due_date, assigned_to, priority, notes, recurrence_value, recurrence_unit } =
+      await request.json();
 
-  const { data, error } = await supabase
-    .from("chores")
-    .insert({
-      title: title.trim(),
-      created_by: user.id,
-      due_date: due_date || null,
-      assigned_to: Array.isArray(assigned_to) && assigned_to.length > 0 ? assigned_to : null,
-      priority: priority || "medium",
-      notes: notes?.trim() || null,
-      recurrence_value: recurrence_value || null,
-      recurrence_unit: recurrence_unit || null,
-    })
-    .select()
-    .single();
+    if (!title?.trim()) return badRequest("Titre requis");
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const chore = await queryOne<Chore>(
+      `INSERT INTO chores
+         (title, created_by, due_date, assigned_to, priority, notes, recurrence_value, recurrence_unit)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        title.trim(),
+        user.id,
+        due_date || null,
+        Array.isArray(assigned_to) && assigned_to.length > 0 ? assigned_to : null,
+        priority || "medium",
+        notes?.trim() || null,
+        recurrence_value || null,
+        recurrence_unit || null,
+      ]
+    );
 
-  // Notification pour tous
-  const lines = [`• ${data.title}`];
-  if (due_date) {
-    const dateLabel = new Date(due_date + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
-    lines.push(`  Pour le ${dateLabel}`);
+    // Notification pour tous
+    const lines = [`• ${chore!.title}`];
+    if (due_date) {
+      const dateLabel = new Date(due_date + "T00:00:00").toLocaleDateString("fr-FR", {
+        day: "numeric", month: "short",
+      });
+      lines.push(`  Pour le ${dateLabel}`);
+    }
+    await notifyAll("Nouvelle tâche", lines.join("\n"));
+
+    return NextResponse.json(chore, { status: 201 });
+  } catch (error) {
+    return serverError("chores/POST", error);
   }
-  await notifyAll(supabase, user.id, "Nouvelle tâche", lines.join("\n"));
-
-  return NextResponse.json(data, { status: 201 });
 }

@@ -1,44 +1,49 @@
-import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { query, queryOne } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/server";
+import { badRequest, notFound, serverError, unauthorized } from "@/lib/http";
+import type { BudgetCategory } from "@/lib/types";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const { id } = await params;
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { name, color, monthly_limit, icon } = await request.json();
-  if (!name?.trim()) return NextResponse.json({ error: "Nom requis" }, { status: 400 });
+    const { name, color, monthly_limit, icon } = await request.json();
+    if (!name?.trim()) return badRequest("Nom requis");
 
-  const { data, error } = await supabase
-    .from("budget_categories")
-    .update({
-      name: name.trim(),
-      color: color || "blue",
-      monthly_limit: Number(monthly_limit) || 0,
-      icon: icon?.trim() || null,
-    })
-    .eq("id", id)
-    .select()
-    .single();
+    const category = await queryOne<BudgetCategory>(
+      `UPDATE budget_categories
+          SET name = $1, color = $2, monthly_limit = $3, icon = $4
+        WHERE id = $5
+        RETURNING *`,
+      [name.trim(), color || "blue", Number(monthly_limit) || 0, icon?.trim() || null, id]
+    );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+    if (!category) return notFound();
+    return NextResponse.json(category);
+  } catch (error) {
+    return serverError("budget/categories/[id]/PUT", error);
+  }
 }
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  try {
+    const { id } = await params;
+    const user = await getCurrentUser();
+    if (!user) return unauthorized();
 
-  const { error } = await supabase.from("budget_categories").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+    // Les dépenses de la catégorie partent avec elle (ON DELETE CASCADE).
+    await query("DELETE FROM budget_categories WHERE id = $1", [id]);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return serverError("budget/categories/[id]/DELETE", error);
+  }
 }
