@@ -120,6 +120,12 @@ export async function GET() {
       base,
       tables,
     },
-    { status: ok ? 200 : 503 }
+    {
+      status: ok ? 200 : 503,
+      // Sans charset explicite, les navigateurs affichent l'UTF-8 comme du
+      // Latin-1 ("Ã€ corriger") — or cette route est faite pour être lue
+      // directement dans un navigateur.
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    }
   );
 }
