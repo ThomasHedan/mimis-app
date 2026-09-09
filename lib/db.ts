@@ -36,7 +36,7 @@ function getClient(): NeonQueryFunction<false, false> {
   if (!client) {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error("DATABASE_URL n'est pas définie.");
-    client = neon(url, { types: customTypes });
+    client = neon(url);
   }
   return client;
 }
@@ -45,12 +45,16 @@ function getClient(): NeonQueryFunction<false, false> {
  * Exécute une requête paramétrée et retourne les lignes typées.
  * Toujours passer les valeurs via `params` ($1, $2, …) — jamais par
  * concaténation — pour écarter toute injection SQL.
+ *
+ * `customTypes` est passé ici, par requête, et non à `neon()` : le driver
+ * ne lit les parseurs de types que dans les options d'appel et ignore
+ * silencieusement ceux du constructeur.
  */
 export async function query<T = Record<string, unknown>>(
   text: string,
   params: unknown[] = []
 ): Promise<T[]> {
-  const rows = await getClient().query(text, params as unknown[]);
+  const rows = await getClient().query(text, params as unknown[], { types: customTypes });
   return rows as T[];
 }
 

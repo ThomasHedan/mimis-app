@@ -115,7 +115,7 @@ export async function GET(request: Request) {
       if (newEvents.length > 0) {
         count += newEvents.length;
         const names = newEvents.slice(0, 2).map((e) => e.title).join(", ");
-        lines.push(`• Nouvel événement${newEvents.length > 1 ? "s" : ""} : ${names}`);
+        lines.push(`• ${newEvents.length > 1 ? "Nouveaux événements" : "Nouvel événement"} : ${names}`);
       }
 
       if (lines.length > 0) {

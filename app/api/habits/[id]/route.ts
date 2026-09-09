@@ -49,7 +49,15 @@ export async function DELETE(
     const user = await getCurrentUser();
     if (!user) return unauthorized();
 
-    await query("DELETE FROM habits WHERE id = $1 AND user_id = $2", [id, user.id]);
+    // Le filtre sur user_id fait que la suppression ne touche rien si
+    // l'habitude appartient à l'autre compte : on répond 404 plutôt qu'un
+    // 200 qui laisserait croire à une suppression.
+    const deleted = await query(
+      "DELETE FROM habits WHERE id = $1 AND user_id = $2 RETURNING id",
+      [id, user.id]
+    );
+    if (deleted.length === 0) return notFound();
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     return serverError("habits/[id]/DELETE", error);
