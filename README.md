@@ -29,13 +29,24 @@ appel ; voir [`db/README.md`](db/README.md).
 
 ### 2. Générer les hash de mots de passe
 
+Deux façons, au choix.
+
+**Depuis l'app, sans machine** — page `/mot-de-passe`, accessible une fois
+connecté. On y colle la valeur actuelle d'`APP_USERS`, on saisit les nouveaux
+mots de passe, et elle rend la valeur complète à recoller dans Vercel. Le
+calcul se fait entièrement dans le navigateur : le mot de passe saisi ne
+transite par aucun serveur. C'est la seule voie praticable depuis un téléphone.
+
+**En ligne de commande :**
+
 ```bash
 npm run hash-password           # saisie masquée
 npm run hash-password -- 'mdp'  # ou en argument
 ```
 
-La commande affiche une ligne `scrypt:32768:8:1:…:…` à recopier dans le champ
-`password` d'`APP_USERS`.
+Les deux produisent la même chose : une ligne `scrypt:32768:8:1:…:…` pour le
+champ `password` d'`APP_USERS`. Le hash de la page et celui du script sont
+bit pour bit identiques — mêmes paramètres, même algorithme.
 
 ### 3. Variables d'environnement
 
